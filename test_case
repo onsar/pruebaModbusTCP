@@ -1,0 +1,8 @@
+#!/usr/bin/env python
+from pymodbus.client.sync import ModbusTcpClient as ModbusClient
+
+cli = ModbusClient('127.0.0.1', port=5020)
+assert cli.connect()
+res = cli.read_input_registers(30001, count=3, unit=1)
+assert not res.isError()
+print(res.registers)
