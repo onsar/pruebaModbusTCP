@@ -1,0 +1,51 @@
+#!/usr/bin/env python
+from pymodbus.client.sync import ModbusTcpClient as ModbusClient
+from pymodbus.constants import Endian
+from pymodbus.payload import BinaryPayloadDecoder
+
+
+cli = ModbusClient('127.0.0.1', port=5020)
+#cli = ModbusClient('192.168.1.131', port=5020)
+#cli = ModbusClient('192.168.1.133', port=5020)
+#cli = ModbusClient('192.168.1.131', port=502)
+assert cli.connect()
+#res = cli.read_input_registers(30002, count=3, unit=1)
+res1 = cli.read_holding_registers(30001, count=2, unit=1)
+res2 = cli.read_holding_registers(30020, count=2, unit=1)
+assert not res1.isError()
+print(res1.registers)
+decoder = BinaryPayloadDecoder.fromRegisters(res1.registers,
+                                             byteorder=Endian.Big,
+                                             wordorder=Endian.Little)
+decoded = decoder.decode_32bit_float()
+print("-" * 60)
+print("Decoded Data")
+print("-" * 60)
+print("%.2f" % decoded)
+
+decoder = BinaryPayloadDecoder.fromRegisters(res2.registers,
+                                             byteorder=Endian.Big,
+                                             wordorder=Endian.Little)
+decoded = decoder.decode_32bit_float()
+print("-" * 60)
+print("Decoded Data")
+print("-" * 60)
+print("%.2f" % decoded)
+
+print("-" * 40)
+print("Bucle")
+
+for i in [30001, 30020]:
+    res3 = cli.read_holding_registers(i, count=2, unit=1)
+    assert not res3.isError()
+
+    print("-" * 30)
+    print("Registros")
+    print(res3.registers)
+    decoder = BinaryPayloadDecoder.fromRegisters(res3.registers,
+                                                 byteorder=Endian.Big,
+                                                 wordorder=Endian.Little)
+    decoded = decoder.decode_32bit_float()
+    print("-" * 30)
+    print("Decoded Data")
+    print("%.2f" % decoded)
