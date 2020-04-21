@@ -72,7 +72,17 @@ for server in servers_list:
             registers_temp_list.append(register)
     print("** " + 'temporal de registros por servidor')
     print(registers_temp_list)
+    server_register_list.append(registers_temp_list)
+print(servers_list)
+print(server_register_list)
 
+# Recorremos todos los servidores y sus registros
+print("*" * 8 + 'Registros ordenados')
+print(len(server_register_list[2]))
+for s in range(len(servers_list)):
+    for r in range(len(server_register_list[s])):
+        print(str(s)+" -> "+str(r))
+        print(servers_list[s] + " -> " + server_register_list[s][r])
 
 '''
 print("DC Power value")
