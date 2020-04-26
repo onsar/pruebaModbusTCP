@@ -28,43 +28,70 @@ def run_binary_payload_ex():
     # ----------------------------------------------------------------------- #
     # We are going to use a simple client to send our requests
     # ----------------------------------------------------------------------- #
-    client = ModbusClient('127.0.0.1', port=5020)
+    client = ModbusClient('192.168.1.133', port=5020)
     client.connect()
 
 
     # ----------------------------------------------------------------------- #
     builder = BinaryPayloadBuilder(byteorder=Endian.Big,
-                                   wordorder=Endian.Little)
+                                   wordorder=Endian.Big)
+
     builder.add_32bit_float(-66.44)
-
     payload = builder.to_registers()
-    print("-" * 60)
-    print("Writing Registers")
-
     print(payload)
-    print("\n")
     payload = builder.build()
-    address = 30001
+    address = 40091
     client.write_registers(address, payload, skip_encode=True, unit=1)
+
     builder.reset()
-    print("-" * 60)
-    print("Registers writed")
-
-
     builder.add_32bit_float(-77.11)
-
     payload = builder.to_registers()
-    print("-" * 60)
-    print("Writing Registers")
-
     print(payload)
-    print("\n")
     payload = builder.build()
-    address = 30020
+    address = 40095
     client.write_registers(address, payload, skip_encode=True, unit=1)
+
     builder.reset()
-    print("-" * 60)
-    print("Registers writed")
+    builder.add_32bit_float(-77.11)
+    payload = builder.to_registers()
+    print(payload)
+    payload = builder.build()
+    address = 40097
+    client.write_registers(address, payload, skip_encode=True, unit=1)
+
+    builder.reset()
+    builder.add_32bit_float(-77.11)
+    payload = builder.to_registers()
+    print(payload)
+    payload = builder.build()
+    address = 40101
+    client.write_registers(address, payload, skip_encode=True, unit=1)
+
+    builder.reset()
+    builder.add_32bit_float(-77.11)
+    payload = builder.to_registers()
+    print(payload)
+    payload = builder.build()
+    address = 40107
+    client.write_registers(address, payload, skip_encode=True, unit=1)
+
+    builder.reset()
+    builder.add_32bit_uint(0x53756e53)
+    payload = builder.to_registers()
+    print(payload)
+    payload = builder.build()
+    address = 40000
+    client.write_registers(address, payload, skip_encode=True, unit=1)
+
+
+
+
+
+
+
+
+
+
 
 
 
