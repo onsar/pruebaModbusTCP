@@ -3,11 +3,49 @@ from pymodbus.client.sync import ModbusTcpClient as ModbusClient
 from pymodbus.constants import Endian
 from pymodbus.payload import BinaryPayloadDecoder
 
+import configparser
 
-cli = ModbusClient('192.168.1.133', port=5020)
-#cli = ModbusClient('192.168.1.131', port=5020)
-#cli = ModbusClient('192.168.1.133', port=5020)
-#cli = ModbusClient('192.168.1.101', port=502)
+parser = configparser.ConfigParser()
+parser.read('config.ini')
+
+# Lista para incluir los servidores
+servers_list=[]
+# Lista para incluir los registros
+registers_list=[]
+# Lista de registros ordenados por sservidor
+# [[aa,ab,ac],[ba,bb,bc],[ca,cb,cc],[da,db,dc]]
+server_register_list=[]
+# Lista de valores de lo registros ordenados por sservidor
+# [[aa,ab,ac],[ba,bb,bc],[ca,cb,cc],[da,db,dc]]
+server_values_list=[]
+
+# devuelve una list con todas las secciones
+sections = parser.sections()
+
+# Listas separadas de servidores y registros
+for section in sections:
+    if parser.has_option(section,'url'):
+        servers_list.append(section)
+    if parser.has_option(section,'server'):
+        registers_list.append(section)
+
+# Registros de cada servidor
+for server in servers_list:
+    registers_temp_list=[]
+    values_temp_list=[]
+    for register in registers_list:
+        if server == parser.get(register,'server'):
+            registers_temp_list.append(register)
+            # Lista para guardar los resultados
+            values_temp_list.append('3')
+    server_register_list.append(registers_temp_list)
+    server_values_list.append(values_temp_list)
+print("*" * 4 + ' Servidores')
+print(servers_list)
+print("*" * 4 + ' Registros agrupados por servidor')
+print(server_register_list)
+
+cli = ModbusClient('192.168.1.131', port=5020)
 assert cli.connect()
 
 # AC Power value
@@ -40,7 +78,10 @@ print("-" * 2 + " Registros")
 print(res1.registers)
 
 # Reactive Power
-res1 = cli.read_holding_registers(40097, count=2, unit=1)
+tx_register = 'fr_rew'
+position = int(parser.get(tx_register,'start'))
+# res1 = cli.read_holding_registers(40097, count=2, unit=1)
+res1 = cli.read_holding_registers(position, count=2, unit=1)
 assert not res1.isError()
 
 decoder = BinaryPayloadDecoder.fromRegisters(res1.registers,
