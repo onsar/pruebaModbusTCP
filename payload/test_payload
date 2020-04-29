@@ -5,6 +5,10 @@ from pymodbus.payload import BinaryPayloadDecoder
 
 import configparser
 
+#################################
+# Parseo de variables del .ini
+#################################
+
 parser = configparser.ConfigParser()
 parser.read('config.ini')
 
@@ -44,6 +48,10 @@ print("*" * 4 + ' Servidores')
 print(servers_list)
 print("*" * 4 + ' Registros agrupados por servidor')
 print(server_register_list)
+
+#################################
+# Lectura de registros de cada servidor
+#################################
 
 cli = ModbusClient('192.168.1.131', port=5020)
 assert cli.connect()
@@ -131,5 +139,42 @@ decoder = BinaryPayloadDecoder.fromRegisters(res1.registers,
 decoded = decoder.decode_32bit_uint()
 print("-" * 4 + "SunSpec Modbus Map" )
 print(decoded)
+print("-" * 2 + " Registros")
+print(res1.registers)
+
+
+###########################################
+# Uso de ini para la lectura de registros
+###########################################
+
+# Reactive Power
+# https://es.wikipedia.org/wiki/Printf
+# https://stackoverflow.com/questions/19122345/convert-string-to-variable-name-in-python
+
+tx_server = 'fronius'
+tx_register = 'fr_rew'
+position = int(parser.get(tx_register,'start'))
+tx_count = int(parser.get(tx_register,'registers'))
+tx_unit = int(parser.get(tx_server,'unit'))
+st_byteorder = parser.get(tx_server,'byteorder')
+exec("tx_byteorder = %s" % (st_byteorder))
+st_wordorder = parser.get(tx_server,'wordorder')
+exec("tx_wordorder = %s" % (st_wordorder))
+#print(type(Endian.Big))
+#print(tx_byteorder)
+
+
+# res1 = cli.read_holding_registers(40097, count=2, unit=1)
+res1 = cli.read_holding_registers(position, count=tx_count, unit=tx_unit)
+assert not res1.isError()
+
+decoder = BinaryPayloadDecoder.fromRegisters(res1.registers,
+                                             byteorder= tx_byteorder,
+                                             wordorder= tx_wordorder)
+decoded = decoder.decode_32bit_float()
+#decoded = decoder.decode_16bit_uint()
+#decoded = decoder.decode_32bit_int()
+print("-" * 4 + " Reactiva")
+print("%.2f" % decoded)
 print("-" * 2 + " Registros")
 print(res1.registers)
