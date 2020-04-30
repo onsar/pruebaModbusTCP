@@ -28,7 +28,7 @@ def run_binary_payload_ex():
     # ----------------------------------------------------------------------- #
     # We are going to use a simple client to send our requests
     # ----------------------------------------------------------------------- #
-    client = ModbusClient('192.168.1.131', port=5020)
+    client = ModbusClient('192.168.1.160', port=5020)
     client.connect()
 
 
