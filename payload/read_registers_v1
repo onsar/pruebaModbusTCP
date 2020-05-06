@@ -1,9 +1,15 @@
 #!/usr/bin/env python
+import sys
+
 from pymodbus.client.sync import ModbusTcpClient as ModbusClient
 from pymodbus.constants import Endian
 from pymodbus.payload import BinaryPayloadDecoder
 
 import configparser
+
+# Librerias para transmitir a emonCMS
+import urllib.request
+import time
 
 #################################
 # Parseo de variables del .ini
@@ -12,6 +18,15 @@ import configparser
 parser = configparser.ConfigParser()
 parser.read('config.ini')
 
+# devuelve una list con todas las secciones
+sections = parser.sections()
+
+# Parseo de las variables de emonCMS
+#   pendiente detectar errores y parar le script
+tx_cms_ip = parser.get('emoncms','cms_ip')
+tx_path = parser.get('emoncms','path')
+tx_key = parser.get('emoncms','key')
+
 # Lista para incluir los servidores
 servers_list=[]
 # Lista para incluir los registros
@@ -19,12 +34,11 @@ registers_list=[]
 # Lista de registros ordenados por sservidor
 # [[aa,ab,ac],[ba,bb,bc],[ca,cb,cc],[da,db,dc]]
 server_register_list=[]
-# Lista de valores de lo registros ordenados por sservidor
+# Lista de valores de lo registros ordenados por servidor
 # [[aa,ab,ac],[ba,bb,bc],[ca,cb,cc],[da,db,dc]]
-server_values_list=[]
+server_register_values_list=[]
 
-# devuelve una list con todas las secciones
-sections = parser.sections()
+
 
 # Listas separadas de servidores y registros
 for section in sections:
@@ -37,23 +51,7 @@ for section in sections:
 ###########################################
 # Uso de ini para la lectura de registros
 ###########################################
-
-# Reactive Power
-# https://es.wikipedia.org/wiki/Printf
-# https://stackoverflow.com/questions/19122345/convert-string-to-variable-name-in-python
-
-tx_server = 'fronius'
-tx_register = 'fr_rew'
-position = int(parser.get(tx_register,'start'))
-tx_count = int(parser.get(tx_register,'registers'))
-tx_unit = int(parser.get(tx_server,'unit'))
-st_byteorder = parser.get(tx_server,'byteorder')
-exec("tx_byteorder = %s" % (st_byteorder))
-st_wordorder = parser.get(tx_server,'wordorder')
-exec("tx_wordorder = %s" % (st_wordorder))
-
-
-# Registros de cada servidor
+# lista de serrvidores y registros de cada servidor
 for server in servers_list:
     registers_temp_list=[]
     values_temp_list=[]
@@ -63,53 +61,143 @@ for server in servers_list:
             # Lista para guardar los resultados
             values_temp_list.append('3')
     server_register_list.append(registers_temp_list)
-    server_values_list.append(values_temp_list)
+    server_register_values_list.append(values_temp_list)
 print("*" * 4 + ' Servidores')
 print(servers_list)
 print("*" * 4 + ' Registros agrupados por servidor')
 print(server_register_list)
 
+###########################################
+# definicion de funciones
+###########################################
+
+def emoncms_tx(_tx_server,_tx_register,_value):
+
+    url = "http://{0}{1}/input/post.json".format(tx_cms_ip,tx_path)
+    string_node_name = "?node={0}".format(_tx_server)
+    string_name_value = "&json={0}:{1}".format(_tx_register,_value)
+    key_write = "&apikey={0}".format(tx_key)
+    full_url = url + string_node_name + string_name_value + key_write
+    print(full_url)
+
+    #Transmision de datos al servidor emonCMS
+    response = urllib.request.urlopen(full_url)
+    web_page=response.read()
+    print(web_page)
+
+###########################################
+# Leemos los registros
+###########################################
+
 
 print("*" * 4 + ' Recorremos servidores y sus registros')
 for s in range(len(servers_list)):
+
     tx_server = servers_list[s]
     tx_url = parser.get(tx_server,'url')
     tx_port = parser.get(tx_server,'port')
-    cli = ModbusClient(tx_url, port=tx_port)
+    ''''
+    tx_unit = int(parser.get(tx_server,'unit'))
+    st_byteorder = parser.get(tx_server,'byteorder')
+    exec("tx_byteorder = %s" % (st_byteorder))
+    st_wordorder = parser.get(tx_server,'wordorder')
+    exec("tx_wordorder = %s" % (st_wordorder))
+    '''
     print('------ ' + tx_server)
+    cli = ModbusClient(tx_url, port=tx_port)
     connexion = True
     try:
+        # sin el assert el fallo en la conexión no se toma como error
         assert cli.connect()
-    except Exception:
-        print("error en la conexión al cliente")
+    except:
         connexion = False
+        print("Error:", sys.exc_info()[0])
+        print("Error en la conexión al Servidor")
 
-    if  connexion == True:
+    if connexion == True:
         for r in range(len(server_register_list[s])):
-            # Preguntamos los valores de cada variable del servidor
+
+
+            # Parseo de variables del .ini
             tx_register = server_register_list[s][r]
 
+            ###########################################
+            # FUNCION preguntar holding valor
+            ###########################################
+
             print('---- ' + tx_register)
-            position = int(parser.get(tx_register,'start'))
+
+            tx_start = int(parser.get(tx_register,'start'))
             tx_count = int(parser.get(tx_register,'registers'))
+
             tx_unit = int(parser.get(tx_server,'unit'))
             st_byteorder = parser.get(tx_server,'byteorder')
             exec("tx_byteorder = %s" % (st_byteorder))
             st_wordorder = parser.get(tx_server,'wordorder')
             exec("tx_wordorder = %s" % (st_wordorder))
-            
+
+            register_red = True
+            value = 33.33
+
             try:
-                res1 = cli.read_holding_registers(position, count=tx_count, unit=tx_unit)
+                res1 = cli.read_holding_registers(tx_start, count=tx_count, unit=tx_unit)
                 decoder = BinaryPayloadDecoder.fromRegisters(res1.registers,
                                                              byteorder= tx_byteorder,
                                                              wordorder= tx_wordorder)
                 st_tipe = "decoder.decode_" + parser.get(tx_register,'tipe') + "()"
                 exec("decoded = %s" % (st_tipe))
-                print(st_tipe)
-                print("%.2f" % decoded)
-                print("registros")
-                print(res1.registers)
+                value = "%.2f" % decoded
 
-            except Exception:
-                print("error al leer el registro: " + tx_register)
-                continue
+                print('st_tipe: '+ st_tipe)
+                print('value: ' + value)
+                print("registros:" + str(res1.registers))
+
+            except:
+                print("Error:", sys.exc_info()[0])
+                print("Error al leer el registro: " + tx_register)
+                register_red = False
+
+            if register_red == True:
+                emoncms_tx(tx_server,tx_register,value)
+'''
+def read_holding_value(tx_server, tx_register):
+
+    print('---- ' + tx_register)
+
+
+    # Variables del servidor
+    tx_unit = int(parser.get(tx_server,'unit'))
+    st_byteorder = parser.get(tx_server,'byteorder')
+    exec("tx_byteorder = %s" % (st_byteorder))
+    st_wordorder = parser.get(tx_server,'wordorder')
+    exec("tx_wordorder = %s" % (st_wordorder))
+
+    #variables del registro
+    tx_start = int(parser.get(tx_register,'start'))
+    tx_count = int(parser.get(tx_register,'registers'))
+
+    register_red = True
+    value = 33.33
+
+    try:
+        res1 = cli.read_holding_registers(tx_start, count=tx_count, unit=tx_unit)
+        decoder = BinaryPayloadDecoder.fromRegisters(res1.registers,
+                                                     byteorder= tx_byteorder,
+                                                     wordorder= tx_wordorder)
+        st_tipe = "decoder.decode_" + parser.get(tx_register,'tipe') + "()"
+        exec("decoded = %s" % (st_tipe))
+        value = "%.2f" % decoded
+
+        print('st_tipe: '+ st_tipe)
+        print('value: ' + value)
+        print("registros:" + str(res1.registers))
+
+    except:
+        print("Error:", sys.exc_info()[0])
+        print("Error al leer el registro: " + tx_register)
+        register_red = False
+
+    if register_red == True:
+        emoncms_tx(tx_server,tx_register,value)
+
+'''
