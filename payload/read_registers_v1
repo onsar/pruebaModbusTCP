@@ -11,6 +11,10 @@ import configparser
 import urllib.request
 import time
 
+import sched, threading
+
+tx_ok = 0
+tx_sent = 0
 #################################
 # Parseo de variables del .ini
 #################################
@@ -76,6 +80,12 @@ print(server_register_list)
 
 def emoncms_tx(_tx_server,_tx_register,_value):
 
+    global tx_ok
+    global tx_sent
+    global tx_cms_ip
+    global tx_path
+    global tx_key
+
     url = "http://{0}{1}/input/post.json".format(tx_cms_ip,tx_path)
     string_node_name = "?node={0}".format(_tx_server)
     string_name_value = "&json={0}:{1}".format(_tx_register,_value)
@@ -85,8 +95,14 @@ def emoncms_tx(_tx_server,_tx_register,_value):
 
     #Transmision de datos al servidor emonCMS
     response = urllib.request.urlopen(full_url)
+    tx_sent=tx_sent+1
     web_page=response.read()
     print(web_page)
+    web_page_str = str(web_page)
+    if web_page_str.find("ok") >= 0:
+        tx_ok=tx_ok+1
+
+    print('tx_ok: ' + str(tx_ok))
 
 def read_holding_value(tx_server_, tx_register_):
 
@@ -111,11 +127,13 @@ def read_holding_value(tx_server_, tx_register_):
 
     register_red = True
     value = 33.33
+    global cli
+    # res1 = cli.read_holding_registers(tx_start, count=tx_count, unit=tx_unit)
 
     try:
         res1 = cli.read_holding_registers(tx_start, count=tx_count, unit=tx_unit)
 
-        print("res1: " + str(res1))
+        # print("res1: " + str(res1))
         print('tx_byteorder: '+ tx_byteorder)
         print('tx_wordorder: '+ tx_wordorder)
 
@@ -139,36 +157,54 @@ def read_holding_value(tx_server_, tx_register_):
 
     except:
         print("Error:", sys.exc_info()[0])
-        print("Error al leer el registro: " + tx_register)
+        print("Error al leer el registro: " + tx_register_)
         register_red = False
 
     if register_red == True:
-        emoncms_tx(tx_server,tx_register,value)
+        emoncms_tx(tx_server_,tx_register_,value)
 
 ###########################################
 # Recorremos los registros
 ###########################################
+def matrix_reading():
+    global servers_list
+    global server_register_list
+    threading.Timer(10.0, matrix_reading).start()
+    print("*" * 4 + ' Recorremos servidores y sus registros')
+    for s in range(len(servers_list)):
 
-print("*" * 4 + ' Recorremos servidores y sus registros')
-for s in range(len(servers_list)):
+        tx_server = servers_list[s]
+        tx_url = parser.get(tx_server,'url')
+        tx_port = parser.get(tx_server,'port')
 
-    tx_server = servers_list[s]
-    tx_url = parser.get(tx_server,'url')
-    tx_port = parser.get(tx_server,'port')
+        print('------ ' + tx_server)
+        global cli
+        cli = ModbusClient(tx_url, port=tx_port)
+        connexion = True
+        try:
+            # sin el assert el fallo en la conexión no se toma como error
+            assert cli.connect()
+        except:
+            connexion = False
+            print("Error:", sys.exc_info()[0])
+            print("Error en la conexión al Servidor")
 
-    print('------ ' + tx_server)
-    cli = ModbusClient(tx_url, port=tx_port)
-    connexion = True
-    try:
-        # sin el assert el fallo en la conexión no se toma como error
-        assert cli.connect()
-    except:
-        connexion = False
-        print("Error:", sys.exc_info()[0])
-        print("Error en la conexión al Servidor")
+        if connexion == True:
+            for r in range(len(server_register_list[s])):
+                tx_register = server_register_list[s][r]
 
-    if connexion == True:
-        for r in range(len(server_register_list[s])):
-            tx_register = server_register_list[s][r]
+                read_holding_value(tx_server, tx_register)
 
-            read_holding_value(tx_server, tx_register)
+def parameters_info():
+    threading.Timer(5.0, parameters_info).start()
+    location = 'ciudad_transporte'
+    parameter='tx_ok'
+    value = tx_ok
+    emoncms_tx(location,parameter,value)
+    parameter='tx_sent'
+    value = tx_sent
+    emoncms_tx(location,parameter,value)
+
+
+matrix_reading()
+parameters_info()
