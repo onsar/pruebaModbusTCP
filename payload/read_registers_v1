@@ -13,6 +13,7 @@ import time
 
 import sched, threading
 
+# Variables de calidad de la transmision al servidor
 tx_ok = 0
 tx_sent = 0
 
@@ -26,9 +27,11 @@ parser.read('config.ini')
 sections = parser.sections()
 
 # Parseo de las variables de emonCMS
+tx_site = parser.get('emoncms','site')
 tx_cms_ip = parser.get('emoncms','cms_ip')
 tx_path = parser.get('emoncms','path')
 tx_key = parser.get('emoncms','key')
+
 
 # Lista para incluir los servidores
 servers_list=[]
@@ -68,9 +71,6 @@ def emoncms_tx(_tx_server,_tx_register,_value):
 
     global tx_ok
     global tx_sent
-    global tx_cms_ip
-    global tx_path
-    global tx_key
 
     url = "http://{0}{1}/input/post.json".format(tx_cms_ip,tx_path)
     string_node_name = "?node={0}".format(_tx_server)
@@ -91,15 +91,10 @@ def emoncms_tx(_tx_server,_tx_register,_value):
     print('tx_ok: ' + str(tx_ok))
     print('tx_sent: ' + str(tx_sent))
 
-# FUNCION: preguntar holding valor
+# FUNCION: preguntar holding valor por MODBUS
 def read_holding_value(tx_server_, tx_register_):
 
     print('---- ' + tx_register_)
-
-    global tx_byteorder
-    global tx_wordorder
-    global cli
-    global decoded
 
     tx_start = int(parser.get(tx_register_,'start'))
     tx_count = int(parser.get(tx_register_,'registers'))
@@ -139,12 +134,10 @@ def read_holding_value(tx_server_, tx_register_):
     if register_red == True:
         emoncms_tx(tx_server_,tx_register_,value)
 
+# FUNCION: Recorremos los registros del fichero .ini
+def matrix_reading(tm):
+    threading.Timer(tm, matrix_reading,args=[tm]).start()
 
-# FUNCION: Recorremos los registros
-def matrix_reading():
-    threading.Timer(5.0, matrix_reading).start()
-    global servers_list
-    global server_register_list
     print("*" * 4 + ' Recorremos servidores y sus registros')
     for s in range(len(servers_list)):
         tx_server = servers_list[s]
@@ -169,16 +162,15 @@ def matrix_reading():
 
                 read_holding_value(tx_server, tx_register)
 
-def parameters_info():
-    threading.Timer(20.0, parameters_info).start()
-    location = 'ciudad_transporte'
-    parameter='tx_ok'
-    value = tx_ok
-    emoncms_tx(location,parameter,value)
-    parameter='tx_sent'
-    value = tx_sent
-    emoncms_tx(location,parameter,value)
+# FUNCION: Enviar al servidor los datos comunes
+def parameters_info(ti):
+    threading.Timer(ti, parameters_info,args=[ti]).start()
+    emoncms_tx(tx_site,'tx_ok',tx_ok)
+    emoncms_tx(tx_site,'tx_sent',tx_sent)
 
+###########################################
+# Ejecución temporal de las funciones
+###########################################
 
-matrix_reading()
-parameters_info()
+matrix_reading(59.0)
+parameters_info(300.0)
